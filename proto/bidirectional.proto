@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package bidirectional;
+
+service Bidirectional {
+  // A Bidirectional streaming RPC.
+  //
+  // Accepts a stream of Message sent while a route is being traversed,
+  // while receiving other Message (e.g. from other users).
+   rpc GetServerResponse(stream Message) returns (stream Message) {}
+   rpc GetStartExperimentResponse(stream StartExperiment) returns (stream StartExperiment) {}
+   rpc GetSDKResponse(stream GetExperimentResponse) returns (stream EXPAlectioResponse) {}
+}
+
+message Message {
+  string message = 1;
+}
+
+message SeverExpStartReturn {
+  string message = 1;
+}
+
+
+message StartExperiment {
+  string exp_token = 1;
+}
+
+message GetExperimentResponse {
+  string exp_token = 1;
+}
+
+message SDKPayload {
+  string type = 1;
+  string user_id = 2;
+  string project_id = 3;
+  string exp_id = 4;
+}
+
+message EXPAlectioResponse {
+  string status = 1;
+  string experiment_id = 2;
+  string project_id = 3;
+  string cur_loop = 4;
+  string user_id = 5;
+  string bucket_name = 6;
+  string type = 7;
+  float n_rec = 8;
+  float n_loop = 9;
+}

@@ -1,0 +1,6 @@
+{
+  "sandbox_bucket": "",
+  "backend_ip": "kube-sdk.api.alectio.com",
+  "grpc_backen": "sdk-stream.api.alectio.com",
+  "backend_route": "127.0.0.1:5000/end_of_task"
+}
