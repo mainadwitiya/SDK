@@ -126,54 +126,7 @@ For example, if it is a classification problem, return the output **before** app
 For more details about the format of the output, please refer to the [examples](./examples) directory.
 
 ## Installation
-### 0. Key Management
-
-If you have not already created your Client ID and Client Secret then do so by visiting:
-1. open https://auth.alectio.com
-2. Login there and click 'Create Client' Link, only change Name in the form and leave everything as it is
-3. Click submit
-4. Now you should have you Client ID and Client Secret
-You will use them in the terminal where you are running alectio-kms
-
-Install the Alectio Key Mangement Package by using:
-```console
-sudo pip install alectio-kms
-```
-
-During installation of alectio-kms make sure that the pip binary is also accessible for sudo/root user. That is use pip outside any of your virtual environment and pip binary is of python3 NOT python2.
-
-Once the package is installed run:
-```console
-sudo alectio-kms
-```
-
-Upon running the package it will walk you through to get you keys setup
-If you are running it for first time then it will ask you to enter your Client ID and Client Secret, it will open a web browser where you will authenticate yourself.
-Upon successful authentication your Client ID, Client Secret and Auth Token will be save at /opt/alectio and will
-also be outputted in your terminal. 
-
-KMS will open the default browser (Most likely one that came default with your OS). Please make sure that you are already signed in with that browser otherwise, you will need to copy and paster the token retrieval URL from the terminal.
-
-### 1. Set up a virtual environment
-We recommend to set-up a virtual environment.
-
-For example, you can use python's built-in virtual environment via:
-
-```
-python3 -m venv env
-source env/bin/activate
-```
-### 2. Install AlectioSDK/requirements
-```
-pip install .
-pip install -r requirements.txt
-```
-### 3. Configure aws credentials
-We need to [configure the aws cli](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html) by running
-```
-aws configure
-```
-Fill in your credentials as requested on your terminal
+Please follow insturctions [here](https://www.notion.so/AlectioSDK-c8fd44a44249497f95a25fac282c2d87)
 ### 4. Run Examples
 
 The remaining installation instructions are detailed in the [examples](./examples) directory. We cover one example for [topic classification](./examples/topic_classification), one example for [image classification](./examples/image_classification) and one example for [object detection](./examples/object_detection).
