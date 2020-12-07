@@ -85,8 +85,8 @@ The test function needs to return a dictionary with two keys
 
 | key | value |
 | --- | ----- |
-| predictions | a dictionary of an index and a prediction for each test sample|
-| labels | a dictionary of an index and a ground truth label for each test sample|
+| predictions | a list of predicted label for each test sample|
+| labels | a list of ground truth label for each test sample|
 
 The format of the values depends on the type of ML problem. Please refer to the [examples](./examples) directory for details.
 
