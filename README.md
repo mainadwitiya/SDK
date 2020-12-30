@@ -75,8 +75,8 @@
 ### Built With
 The SDK is mainly built using the following
 * [Python](https://www.python.org/)
-* [Flask](https://flask.palletsprojects.com/en/1.1.x/)
-* [Gunicorn](https://gunicorn.org/)
+* [GRPC] (https://github.com/grpc/grpc)
+* [PyTorch] (https://pytorch.org/docs/stable/index.html)
 
 
 <!-- GETTING STARTED -->
