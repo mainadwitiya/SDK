@@ -3,7 +3,7 @@ Parse YAML files and perform sanity checks on the files.
 """
 import yaml
 
-from alectio.exceptions import YAMLFieldNotFound, InvalidYAMLField, InvalidYAMLFieldType
+from alectio_sdk.cli.exceptions import YAMLFieldNotFound, InvalidYAMLField, InvalidYAMLFieldType
 
 
 class ParseStrategyYaml():

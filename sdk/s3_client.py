@@ -3,6 +3,11 @@ import os
 import sys
 import pickle
 import json
+import io
+from botocore.exceptions import ClientError
+import logging
+from pyarrow import feather
+import pandas as pd
 from tqdm import tqdm
 from boto3.s3.transfer import TransferConfig
 from io import BytesIO
@@ -47,7 +52,7 @@ class S3Client:
     """Boto3 client to S3"""
 
     def __init__(self):
-        presigned_cred = requests.post("http://api.alectio.com/experiments/getcredentials").json() 
+        presigned_cred = requests.post("http://api.alectio.com/experiments/getcredentials").json()
         # boto3 clients to read / write to S3 bucket
         self.client = boto3.client(
             "s3",
@@ -60,13 +65,13 @@ class S3Client:
     def read(self, bucket_name, object_key, file_format):
         """ Read a file from the S3 bucket containing
         this experiment
-    
+
         object_key: str.
            object key for this file
-           
+
         file_format: str.
             format of the file {"pickle", "json"}
-        
+
         """
 
         s3_object = self.client.get_object(Bucket=bucket_name, Key=object_key)
@@ -85,16 +90,16 @@ class S3Client:
     def write(self, obj, bucket_name, object_key, file_format):
         """Write an object to S3 bucket
         Mostly used for writing ExperimentData.pkl
-        InferenceData.pkl files 
-        
+        InferenceData.pkl files
+
         obj: dict | list | string
-        
+
         bucket_name: name of the s3 bucket
         object_key: str.
             object key in the S3 bucket
-            
+
         file_format: str.
-            format of the file to save the object 
+            format of the file to save the object
             {pickle, json}
 
         """
@@ -105,12 +110,12 @@ class S3Client:
         elif file_format == "json":
             bytestr = json.dumps(obj)
         elif file_format == "txt":
-            bytestr = b"{}".format(string)
+            bytestr = b"{}".format(obj)
 
         # @TODO add md5 hash
         # @TODO return success or failure message
         # put in S3
-        r = self.client.put_object(Bucket=bucket_name, Key=object_key, Body=bytestr,)
+        r = self.client.put_object(Bucket=bucket_name, Key=object_key, Body=bytestr, )
 
         return
 
@@ -164,13 +169,47 @@ class S3Client:
 
         return
 
+    def upload_file(self, file_name, bucket, object_name=None):
+        """Upload a file to an S3 bucket
+
+        :param file_name: File to upload
+        :param bucket: Bucket to upload to
+        :param object_name: S3 object name. If not specified then file_name is used
+        :return: True if file was uploaded, else False
+        """
+
+        # If S3 object_name was not specified, use file_name
+        if object_name is None:
+            object_name = file_name
+
+        # Upload the file
+        s3_client = boto3.client('s3')
+        try:
+            response = s3_client.upload_file(file_name, bucket, object_name)
+        except ClientError as e:
+            logging.error(e)
+            return False
+        return True
+
     def download_checkpoints(self, bucket_name, project_id, experiment_id, cur_loop, log_dir):
         checkpoints_to_download = list(range(cur_loop))
 
         for checkpoint in checkpoints_to_download:
-            print(f"downloading file ckpt_{checkpoint}.pth")
+            print(f"downloading file ckpt_{checkpoint}")
             self.client.download_file(
                 f"{bucket_name}",
-                f"{project_id}/{experiment_id}/ckpt_{checkpoint}.pth",
-                f"{log_dir}/ckpt_{checkpoint}.pth",
+                f"{project_id}/{experiment_id}/ckpt_{checkpoint}",
+                f"{log_dir}/ckpt_{checkpoint}",
             )
+
+    def upload_feather_s3(self, df, bucket_name, object_key):
+        s3_resource = boto3.resource('s3')
+        with BytesIO() as f:
+            output_stream = BytesIO()
+            df.to_feather(output_stream)
+            s3_resource.Object(bucket_name, object_key).put(Body=output_stream.getvalue())
+
+    def read_feather_file_from_s3(self, bucket_name, object_key):
+        s3 = boto3.client('s3')
+        retr = s3.get_object(Bucket=bucket_name, Key=object_key)
+        return pd.read_feather(io.BytesIO(retr['Body'].read()))

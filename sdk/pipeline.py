@@ -1,11 +1,6 @@
-from flask import jsonify
-from flask import Flask, Response
-from flask import request
-from flask import send_file
-
+import pandas as pd
 # from waitress import serve
 import numpy as np
-import json
 import requests
 import traceback
 import sys
@@ -13,7 +8,6 @@ import os
 import psutil
 import time
 import boto3
-import json
 import logging
 import sklearn.metrics
 from copy import deepcopy
@@ -21,13 +15,9 @@ from .s3_client import S3Client
 from alectio_sdk.metrics.object_detection import Metrics, batch_to_numpy
 from alectio_sdk.backend.backend import Backend
 import sentry_sdk
-from sentry_sdk.integrations.flask import FlaskIntegration
-from sklearn.externals import joblib
-from pathlib import Path
-
 # modules for testing
 import argparse
-import yaml, json
+import json
 
 
 class Pipeline(object):
@@ -46,15 +36,15 @@ class Pipeline(object):
 
     def __init__(self, name, train_fn, test_fn, infer_fn, getstate_fn, args, token):
         """
-        sentry_sdk.init(
-            dsn="https://4eedcc29fa7844828397dca4afc2db32@o409542.ingest.sentry.io/5282336",
-            integrations=[FlaskIntegration()]
-        )
         """
-        self.app = Flask(name)
-        self.gunicorn_logger = logging.getLogger("gunicorn.error")
-        self.app.logger.handlers = self.gunicorn_logger.handlers
-        self.app.logger.setLevel(self.gunicorn_logger.level)
+        self.logger = logging.getLogger("alectio logger")
+        self.ch = logging.StreamHandler()
+
+        self.ch.setLevel(logging.DEBUG)
+        self.formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        self.ch.setFormatter(self.formatter)
+        self.logger.addHandler(self.ch)
+
         self.train_fn = train_fn
         self.test_fn = test_fn
         self.infer_fn = infer_fn
@@ -67,54 +57,25 @@ class Pipeline(object):
 
         self.client_token = token
         self.backend = None
-        # self._notifyserverstatus()
-        if "onprem" in self.args and not self.args["onprem"]:
-            self.demopayload = self._setdemovars(self.args["demoname"])
-        else:
-            self.demopayload = {
-                "project_id": "",
-                "user_id": "",
-                "experiment_id": "",
-                "bucket_name": "",
-                "type": "",
-            }
-
-        #### Check if directories that will or will not be posted to Alectio team exists ( this posting of data is based on user acceptance to on or off prem)
-        # self._checkdirs(args["EXPT_DIR"])
-        # self._checkdirs(args["LOG_DIR"])
-
-        # one loop
-        # self.app.add_url_rule("/one_loop", "one_loop", self.one_loop, methods=["POST"])
-        # self.app.add_url_rule("/end_exp", "end_exp", self.end_exp, methods=["POST"])
 
     def _notifyserverstatus(self, logdir):
         logging.basicConfig(
             filename=os.path.join(logdir, "Appstatus.log"), level=logging.INFO
         )
-        self.app.logger.info("Flask app from Alectio initialized successfully")
-        self.app.logger.info(
+        self.logger.info("Alectio experiment initialized successfully")
+        self.logger.info(
             "Training checkpoints and other logs for current experiment will be written into the folder {}".format(
                 logdir
             )
         )
-        self.app.logger.info(
-            "Press CTRL + C to exit flask app , if Flask app terminates in the middle use fuser -k <port number>/tcp to terminate current process and relaunch alectio sdk"
+        self.logger.info(
+            "Press CTRL + C to exit the experiment , if this run terminates in the middle just relaunch alectio sdk"
         )
 
     def _checkdirs(self, dir_):
         if not os.path.exists(dir_):
             os.makedirs(dir_, exist_ok=True)
 
-    def _setdemovars(self, demo="coco"):
-        if demo == "coco":
-            demopayload = {
-                "project_id": "5e1ec656aa8e11ea8c639afd8b723gds",
-                "user_id": "adc12714bb3a11eab6053af9d318993f",
-                "experiment_id": "e0a6d7d29e2611ea97c23af9d3189111102",
-                "bucket_name": "alectio-company-demos",
-                "type": "Object Detection",
-            }
-            return demopayload
 
     def _estimate_exp_time(self, last_time):
         """
@@ -135,13 +96,13 @@ class Pipeline(object):
 
         loops_completed = self.cur_loop + 1
         time_left = convert(last_time * (self.n_loop - loops_completed))
-        self.app.logger.info("Estimated time left for the experiment: {}".format(time_left))
+        self.logger.info("Estimated time left for the experiment: {}".format(time_left))
         return time_left
 
     def one_loop(self, request):
         # Get payload args
 
-        self.app.logger.info("Extracting payload arguments from Alectio")
+        self.logger.info("Extracting payload arguments from Alectio")
         # Get payload args
         payload = {
             "experiment_id": request["experiment_id"],
@@ -153,16 +114,19 @@ class Pipeline(object):
             "n_rec": request["n_rec"],
             "n_loop": request["n_loop"]
             }
+        print('Current payload: ')
+        print(payload)
+
         self.logdir = payload["experiment_id"]
         self._checkdirs(self.logdir)
         self.args["LOG_DIR"] = self.logdir
 
         self._notifyserverstatus(self.logdir)
-        self.app.logger.info("Valid payload arguments extracted")
-        self.app.logger.info("Initializing process to train and optimize your model")
+        self.logger.info("Valid payload arguments extracted")
+        self.logger.info("Initializing process to train and optimize your model")
         returned_payload = self._one_loop(payload, self.args)
-        self.app.logger.info("Optimization process complete !")
-        self.app.logger.info(
+        self.logger.info("Optimization process complete !")
+        self.logger.info(
             "Your results for this loop should be visible in Alectio website shortly"
         )
 
@@ -175,7 +139,7 @@ class Pipeline(object):
             url=url, json=returned_payload, headers=headers
         ).status_code
         if status == 200:
-            self.app.logger.info(
+            self.logger.info(
                 "Experiment {} running".format(payload["experiment_id"])
             )
             return {"Message": "Loop Started - 200 status returned"}
@@ -198,13 +162,12 @@ class Pipeline(object):
         """
 
         # payload = json.load(open(args["sample_payload"]))
-        self.app.logger.info("Extracting essential experiment params")
+        self.logger.info("Extracting essential experiment params")
 
         # read selected indices upto this loop
         payload["cur_loop"] = int(payload["cur_loop"])
         # self.curout_loop = payload["cur_loop"]
 
-        # Leave cur_loop - 1 when doing a 1 dag solution, when doing 2 dag cur_loop remains the same
         self.cur_loop = payload["cur_loop"]
         self.bucket_name = payload["bucket_name"]
         self.n_loop = payload["n_loop"]
@@ -213,7 +176,7 @@ class Pipeline(object):
         self.type = payload["type"]
 
         # dir for expt log in S3
-        expt_dir = [payload["user_id"], payload["project_id"], payload["experiment_id"]]
+        #expt_dir = [payload["user_id"], payload["project_id"], payload["experiment_id"]] # This was never being used
 
         if self.bucket_name == self.config["sandbox_bucket"]:
             # shared S3 bucket for sandbox user
@@ -231,26 +194,15 @@ class Pipeline(object):
 
             self.project_dir = os.path.join(payload["project_id"])
 
-        if (
-            self.demopayload["bucket_name"] == "alectio-company-demos"
-        ):  ####### Future Front end optimzation needed to avoid double writing
-            self.demoexpt_dir = os.path.join(
-                self.args["demoname"],
-                self.demopayload["project_id"],
-                self.demopayload["experiment_id"],
-            )
-
-            self.demoproject_dir = os.path.join(self.demopayload["project_id"])
-
-        self.app.logger.info("Essential experiment params have been extracted")
+        self.logger.info("Essential experiment params have been extracted")
         # get meta-data of the data set
-        self.app.logger.info("Verifying the meta.json that was uploaded by the user")
+        self.logger.info("Verifying the meta.json that was uploaded by the user")
         key = os.path.join(self.project_dir, "meta.json")
         bucket = boto3.resource("s3").Bucket(self.bucket_name)
 
         json_load_s3 = lambda f: json.load(bucket.Object(key=f).get()["Body"])
         self.meta_data = json_load_s3(key)
-        self.app.logger.info(
+        self.logger.info(
             "SDK Retrieved file: {} from bucket : {}".format(key, self.bucket_name)
         )
 
@@ -259,36 +211,19 @@ class Pipeline(object):
 
         if self.cur_loop == 0:
             self.resume_from = None
-            self.app.logger.info(
+            self.logger.info(
                 "Extracting indices for our reference, this may take time ... Please be patient"
             )
             self.state_json = self.getstate_fn(args)
             object_key = os.path.join(self.expt_dir, "data_map.pkl")
-            self.app.logger.info("Extraction complete !!!")
-            self.app.logger.info(
+            self.logger.info("Extraction complete !!!")
+            self.logger.info(
                 "Creating index to records data reference for the current experiment"
             )
             self.client.multi_part_upload_with_s3(
                 self.state_json, self.bucket_name, object_key, "pickle"
             )
-            if "onprem" in self.args and not self.args["onprem"]:
-                demoobject_key = os.path.join(self.demoexpt_dir, "data_map.pkl")
-                demometaobject_key = os.path.join(
-                    os.path.dirname(self.demoexpt_dir), "meta.json"
-                )
-                self.client.multi_part_upload_with_s3(
-                    self.state_json,
-                    self.demopayload["bucket_name"],
-                    demoobject_key,
-                    "pickle",
-                )
-                self.client.multi_part_upload_with_s3(
-                    self.meta_data,
-                    self.demopayload["bucket_name"],
-                    demometaobject_key,
-                    "json",
-                )
-            self.app.logger.info("Reference creation complete")
+            self.logger.info("Reference creation complete")
         else:
 
             # check if ckpt cur_loop - 1 exists, otherwise we need to download it from S3
@@ -296,7 +231,7 @@ class Pipeline(object):
                 os.path.join(self.args["EXPT_DIR"], f"ckpt_{self.cur_loop-1}")
             ):
                 # need to download the checkpoint files from S3
-                self.app.logger.info(
+                self.logger.info(
                     "Starting to copy checkpoints for cloned experiment..."
                 )
                 self.client.download_checkpoints(
@@ -306,26 +241,26 @@ class Pipeline(object):
                     payload["cur_loop"],
                     self.args["EXPT_DIR"],
                 )
-                self.app.logger.info(
+                self.logger.info(
                     "Finished downloading checkpoints for cloned experiment"
                 )
 
-            self.app.logger.info("Resuming from a checkpoint from a previous loop ")
+            self.logger.info("Resuming from a checkpoint from a previous loop ")
             # two dag approach needs to refer to the previous checkpoint
             self.resume_from = "ckpt_{}".format(self.cur_loop - 1)
 
         self.ckpt_file = "ckpt_{}".format(self.cur_loop)
-        self.app.logger.info("Initializing training of your model")
+        self.logger.info("Initializing training of your model")
 
         self.train(args)
-        self.app.logger.info("Training complete !")
-        self.app.logger.info("Initializing testing of your model !")
+        self.logger.info("Training complete !")
+        self.logger.info("Initializing testing of your model !")
         self.test(args)
-        self.app.logger.info("Testing complete !")
-        self.app.logger.info("Assessing current best model")
+        self.logger.info("Testing complete !")
+        self.logger.info("Assessing current best model")
         self.infer(args)
-        self.app.logger.info("Assesment complete ")
-        self.app.logger.info(
+        self.logger.info("Assesment complete ")
+        self.logger.info(
             "Time to check what records to train on next loop , visit our front end for more details"
         )
 
@@ -333,6 +268,7 @@ class Pipeline(object):
         del payload["type"]
         del payload["cur_loop"]
         del payload["bucket_name"]
+        payload['sdk_version'] = '0.6.8'
         return payload
 
     def train(self, args):
@@ -346,7 +282,7 @@ class Pipeline(object):
         start = time.time()
 
         self.labeled = []
-        self.app.logger.info("Reading indices to train on")
+        self.logger.info("Reading indices to train on")
         for i in range(self.cur_loop + 1):
             object_key = os.path.join(
                 self.expt_dir, "selected_indices_{}.pkl".format(i)
@@ -355,7 +291,8 @@ class Pipeline(object):
                 self.bucket_name, object_key=object_key, file_format="pickle"
             )
             self.labeled.extend(selected_indices)
-        self.app.logger.info("Labelled records are ready to be trained")
+
+        self.logger.info("Labelled records are ready to be trained")
         self.labeled.sort()  # Maintain increasing order
 
         train_op = self.train_fn(
@@ -386,23 +323,6 @@ class Pipeline(object):
         self.client.multi_part_upload_with_s3(
             insights, self.bucket_name, object_key, "pickle"
         )
-        if "onprem" in self.args and not self.args["onprem"]:
-            demoinsightsobject_key = os.path.join(
-                self.demoexpt_dir, "insights_{}.pkl".format(self.cur_loop)
-            )
-            self.client.multi_part_upload_with_s3(
-                insights,
-                self.demopayload["bucket_name"],
-                demoinsightsobject_key,
-                "pickle",
-            )
-            democheckpointsobject_key = os.path.join(self.demoexpt_dir, self.ckpt_file)
-            loopcheckpointfile = os.path.join(self.args["LOG_DIR"], self.ckpt_file)
-            self.client.multi_part_upload_file(
-                loopcheckpointfile,
-                self.demopayload["bucket_name"],
-                democheckpointsobject_key,
-            )
 
         return
 
@@ -414,11 +334,11 @@ class Pipeline(object):
            args: a dict whose keys include all of the arguments needed for your `test` function which is defined in `processes.py`.
 
         """
-        self.app.logger.info("Extracting test results ")
+        self.logger.info("Extracting test results ")
         res = self.test_fn(args, ckpt_file=self.ckpt_file)
 
         predictions, ground_truth = res["predictions"], res["labels"]
-        self.app.logger.info("Writing test results to S3")
+        self.logger.info("Writing test results to S3")
 
         # write predictions and labels to S3
         object_key = os.path.join(
@@ -428,35 +348,14 @@ class Pipeline(object):
             predictions, self.bucket_name, object_key, "pickle"
         )
 
-        if "onprem" in self.args and not self.args["onprem"]:
-            demopredsobject_key = os.path.join(
-                self.demoexpt_dir, "test_predictions_{}.pkl".format(self.cur_loop)
-            )
-            self.client.multi_part_upload_with_s3(
-                predictions,
-                self.demopayload["bucket_name"],
-                demopredsobject_key,
-                "pickle",
-            )
-
         if self.cur_loop == 0:
             # write ground truth to S3
             object_key = os.path.join(
-                self.expt_dir, "test_ground_truth.pkl".format(self.cur_loop)
+                self.expt_dir, "test_ground_truth_{}.pkl".format(self.cur_loop)
             )
             self.client.multi_part_upload_with_s3(
                 ground_truth, self.bucket_name, object_key, "pickle"
             )
-            if "onprem" in self.args and not self.args["onprem"]:
-                demogtsobject_key = os.path.join(
-                    self.demoexpt_dir, "test_ground_truth.pkl"
-                )
-                self.client.multi_part_upload_with_s3(
-                    ground_truth,
-                    self.demopayload["bucket_name"],
-                    demogtsobject_key,
-                    "pickle",
-                )
 
         self.compute_metrics(predictions, ground_truth)
         return
@@ -502,8 +401,11 @@ class Pipeline(object):
             TP = confusion_matrix.diagonal()
             TN = confusion_matrix.sum() - (FP + FN + TP)
             precision = TP / (TP + FP)
+            precision[np.isnan(precision)] = 0
             recall = TP / (TP + FN)
+            recall[np.isnan(recall)] = 0
             f1_score = 2 * precision * recall / (precision + recall)
+            f1_score[np.isnan(f1_score)] = 0
             label_disagreement = {k: v.round(3) for k, v in enumerate(FP / (FP + TN))}
 
             metrics = {
@@ -524,16 +426,6 @@ class Pipeline(object):
         self.client.multi_part_upload_with_s3(
             metrics, self.bucket_name, object_key, "pickle"
         )
-        if "onprem" in self.args and not self.args["onprem"]:
-            demometricsobject_key = os.path.join(
-                self.demoexpt_dir, "metrics_{}.pkl".format(self.cur_loop)
-            )
-            self.client.multi_part_upload_with_s3(
-                metrics,
-                self.demopayload["bucket_name"],
-                demometricsobject_key,
-                "pickle",
-            )
         return
 
     def infer(self, args):
@@ -544,54 +436,55 @@ class Pipeline(object):
            args: a dict whose keys include all of the arguments needed for your `infer` function which is defined in `processes.py`.
 
         """
-        self.app.logger.info(
+        self.logger.info(
             "Getting insights on currently unused/unlabelled train data"
         )
-        self.app.logger.warning(
+        self.logger.warning(
             "This may take some time. Please be patient ............"
         )
 
         ts = range(self.meta_data["train_size"])
         self.unlabeled = sorted(list(set(ts) - set(self.labeled)))
+        args['cur_loop'] = self.cur_loop
         outputs = self.infer_fn(
             args, unlabeled=deepcopy(self.unlabeled), ckpt_file=self.ckpt_file
-        )["outputs"]
-        self.app.logger.info(
-            "Sending assesments on unlabelled train set to Alectio team"
         )
 
-        # Remap to absolute indices
-        remap_outputs = {}
-        for i, (k, v) in enumerate(outputs.items()):
-            ix = self.unlabeled.pop(0)
-            remap_outputs[ix] = v
+        if outputs is not None:
+            outputs = outputs['outputs']
+            # Remap to absolute indices
+            remap_outputs = {}
+            for _, (k, v) in enumerate(outputs.items()):
+                ix = self.unlabeled.pop(0)
+                remap_outputs[ix] = v
 
-        # write the output to S3
-        key = os.path.join(self.expt_dir, "infer_outputs_{}.pkl".format(self.cur_loop))
-        localfile = os.path.join("log", "infer_outputs_{}.pkl".format(self.cur_loop))
-        joblib.dump(remap_outputs, localfile)
-        self.client.multi_part_upload_file(localfile, self.bucket_name, key)
-        """
-        self.client.multi_part_upload_with_s3(
-            remap_outputs, self.bucket_name, key, "pickle"
-        )
-        """
+            pre_softmax = {}
+            for k, v in remap_outputs.items():
+                pre_softmax[k] = v['pre_softmax']
 
-        if "onprem" in self.args and not self.args["onprem"]:
-            demoinferobject_key = os.path.join(
-                self.demoexpt_dir, "infer_outputs_{}.pkl".format(self.cur_loop)
+            self.logger.info(
+                "Sending assessments on unlabelled train set to Alectio team"
             )
-            """
-            self.client.multi_part_upload_with_s3(
-                remap_outputs,
-                self.demopayload["bucket_name"],
-                demoinferobject_key,
-                "pickle",
-            )
-            """
-            self.client.multi_part_upload_file(
-                localfile, self.demopayload["bucket_name"], demoinferobject_key
-            )
+
+            if "Classification" in self.type:
+                object_key = os.path.join(self.expt_dir, 'pre_softmax_{}.pkl'.format(self.cur_loop))
+                self.client.multi_part_upload_with_s3(
+                    pre_softmax,
+                    self.bucket_name,
+                    object_key,
+                    "pickle"
+                )
+
+        else:
+
+            if "Object Detection" in self.type:
+                object_key = os.path.join(self.expt_dir, 'infer_outputs_{}.db'.format(self.cur_loop))
+                local_db = os.path.join(self.args['EXPT_DIR'], 'infer_outputs_{}.db'.format(self.cur_loop))
+                # upload sqlite db
+                self.client.upload_file(local_db, self.bucket_name, object_key)
+                # delete local version
+                os.remove(local_db)
+                
         return
 
     def __call__(self, debug=False, host="0.0.0.0", port=5000):
@@ -636,21 +529,3 @@ class Pipeline(object):
                     else:
                         time.sleep(10)
                         print(".", end = '', flush=True)
-
-
-
-    @staticmethod
-    def shutdown_server():
-        func = request.environ.get("werkzeug.server.shutdown")
-        if func is None:
-            raise RuntimeError("Not running with the Werkzeug Server")
-        func()
-
-    @staticmethod
-    def end_exp():
-        print()
-        print("======== Experiment Ended ========")
-        print("Server shutting down...")
-        p = psutil.Process(os.getpid())
-        p.terminate()
-        return "Experiment complete"
