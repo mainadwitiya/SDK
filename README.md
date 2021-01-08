@@ -75,8 +75,9 @@
 ### Built With
 The SDK is mainly built using the following
 * [Python](https://www.python.org/)
-* [GRPC] (https://github.com/grpc/grpc)
-* [PyTorch] (https://pytorch.org/docs/stable/index.html)
+* [GRPC](https://github.com/grpc/grpc)
+* [PyTorch](https://pytorch.org/docs/stable/index.html)
+* [Tensorflow](https://www.tensorflow.org/)
 
 
 <!-- GETTING STARTED -->
