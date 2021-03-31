@@ -1,1 +1,2 @@
-__version__ = '0.6.8'
+name = "alectio"
+__version__ = '0.6.13'

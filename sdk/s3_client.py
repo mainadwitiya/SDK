@@ -3,17 +3,14 @@ import os
 import sys
 import pickle
 import json
-import io
 from botocore.exceptions import ClientError
 import logging
-from pyarrow import feather
-import pandas as pd
-from tqdm import tqdm
 from boto3.s3.transfer import TransferConfig
-from io import BytesIO
 from threading import Thread, Lock
-from hurry.filesize import size
+from io import BytesIO
 import requests
+
+
 
 
 class ProgressPercentage(object):
@@ -115,7 +112,7 @@ class S3Client:
         # @TODO add md5 hash
         # @TODO return success or failure message
         # put in S3
-        r = self.client.put_object(Bucket=bucket_name, Key=object_key, Body=bytestr, )
+        r = self.client.put_object(Bucket=bucket_name, Key=object_key, Body=bytestr,)
 
         return
 
@@ -198,18 +195,6 @@ class S3Client:
             print(f"downloading file ckpt_{checkpoint}")
             self.client.download_file(
                 f"{bucket_name}",
-                f"{project_id}/{experiment_id}/ckpt_{checkpoint}",
-                f"{log_dir}/ckpt_{checkpoint}",
+                f"{project_id}/{experiment_id}/ckpt_{checkpoint}.pth",
+                f"{log_dir}/ckpt_{checkpoint}.pth",
             )
-
-    def upload_feather_s3(self, df, bucket_name, object_key):
-        s3_resource = boto3.resource('s3')
-        with BytesIO() as f:
-            output_stream = BytesIO()
-            df.to_feather(output_stream)
-            s3_resource.Object(bucket_name, object_key).put(Body=output_stream.getvalue())
-
-    def read_feather_file_from_s3(self, bucket_name, object_key):
-        s3 = boto3.client('s3')
-        retr = s3.get_object(Bucket=bucket_name, Key=object_key)
-        return pd.read_feather(io.BytesIO(retr['Body'].read()))

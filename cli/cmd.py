@@ -6,13 +6,14 @@ import getpass
 import json
 import logging
 import os
+from os import path
 import shutil
 import subprocess
 import sys
 import textwrap
 import time
 import traceback
-
+import xtarfile as tarfile
 import click
 from click.exceptions import ClickException
 import six
@@ -21,8 +22,12 @@ import yaml
 import alectio_sdk
 import requests
 from alectio_sdk.cli.alectio_cli import AlectioClient
+from alectio_sdk.cli.datasets.downloader import Downloader
 from tabulate import tabulate
-
+import urllib.request
+from os.path import expanduser
+import os
+import yaml
 
 
 LOG_STRING = click.style("alectio", fg="blue", bold=True)
@@ -39,7 +44,7 @@ _logger = None
 
 CONTEXT = dict(default_map={})
 
-alectio = AlectioClient()
+downloader = Downloader('universal')
 def termerror(string, **kwargs):
     string = "\n".join(["{} {}".format(ERROR_STRING, s) for s in string.split("\n")])
     _log(
@@ -47,6 +52,17 @@ def termerror(string, **kwargs):
         newline=True,
         silent=not _show_errors,
         level=logging.ERROR,
+        **kwargs
+    )
+
+
+def termwarn(string, **kwargs):
+    string = "\n".join(["{} {}".format(WARN_STRING, s) for s in string.split("\n")])
+    _log(
+        string=string,
+        newline=True,
+        silent=not _show_errors,
+        level=logging.WARN,
         **kwargs
     )
 
@@ -141,15 +157,45 @@ def main(ctx):
 
 @main.command(name='login')
 @click.argument("key", nargs=-1)
-@click.option("--cloud", is_flag=True, help="Login to the cloud instead of local")
-@click.option("--host", default=None, help="Login to a specific instance of W&B")
 @click.option(
     "--relogin", default=None, is_flag=True, help="Force relogin if already logged in."
 )
 @click.option("--anonymously", default=False, is_flag=True, help="Log in anonymously")
+def login(key, relogin, anonymously, no_offline=False):
 
-def login(key, host, cloud, relogin, anonymously, no_offline=False):
-    print(key)
+    if len(key) == 0:
+        termerror("API Key is required.")
+        sys.exit(0)
+
+    key = key[0]
+    
+    headers = {"Authorization": "Bearer " + key}
+    response = requests.post('https://api.alectio.com/api/me', headers=headers)
+    if response.status_code == 401:
+        termerror("API Key has expired or malformed")
+    elif response.status_code == 200:
+        payload = response.json()
+        payload['api_key'] = key
+        payload['user_id'] = payload['id']
+        dict_file = [payload]
+
+        alectio_dir = expanduser("~/.alectio")
+        credential_file = expanduser(alectio_dir+'/credentials.yaml')
+        if os.path.isdir(alectio_dir) and os.path.isfile(credential_file):
+            termerror("Auth data already exists. If you want to reinitialize run alectio login with --relogin flag.")
+        else:
+            os.mkdir(alectio_dir) if not os.path.isdir(alectio_dir) else _log('Alectio dir exists')
+            try:
+                with open(credential_file, 'w') as file:
+                    yaml.dump(dict_file, file)
+            except:
+                termerror('Not able to wirte file at ' +  credential_file)
+            _log('Alectio Login complete')
+    else:
+        termerror("Something went wrong double check you API Key")
+
+    _log('You are logged in as: ' + payload['username'])
+
 
 
 @main.command(name='get')
@@ -157,6 +203,7 @@ def login(key, host, cloud, relogin, anonymously, no_offline=False):
 @click.option("--project", default=None, help="Specify project id, not sure of project id run 'alectio get projects'")
 def get(entity, project):
     entity = entity[0]
+    alectio = AlectioClient()
     if entity == 'projects':
         projects = alectio.projects()
         projects_table = []
@@ -197,8 +244,120 @@ def get(entity, project):
         pass
 
 
+@main.command(name='library-run')
+@click.option("--token", default=None, help="Enter the Token you after creating an experiment for alectio library project")
+@click.option("--resume", is_flag=True, default=False, help="Enter the Token you after creating an experiment for alectio library project")
+@click.option("--auto_run", is_flag=True, default=False, help="Enter the Token you after creating an experiment for alectio library project")
+def library_run(token, resume, auto_run):
+    if path.exists('./.alectio') and not resume:
+        termwarn('An experiment initialized here. Use either alectio library-run --resume or start a new experiment with alectio clear')
+        sys.exit(0)
+    elif path.exists('./.alectio') and resume:
+        pass
+
+    else:
+        if token is None:
+            termerror("Token is required.")
+            sys.exit(1)
+        _log("Experiment Initilizing.")
+
+        if not resume:
+            payload = requests.post('https://api.alectio.com/experiments/libraryRunFetch', json={'token': token}).json()
+        else:
+            payload_file = open('./.alectio/alectio_env.json')
+            payload = json.load(payload_file)
+            payload_file.close()
+
+        if payload['status'] == 'error':
+            termerror(payload['message'])
+            sys.exit(1)
+        
+        if payload['data_url'] is None or payload['code_url'] is None:
+            termerror('This Dataset or model is not supported it. Please check back')
+            sys.exit(1)
+
+        else:
+            if not path.exists('./.alectio'):
+                os.mkdir('./.alectio')
+                with open('./.alectio/alectio_env.json', 'w') as fp:
+                    json.dump(payload, fp)
+            
+            while True:
+                if path.exists('./'+payload['code_file']):
+                    break
+                try:
+                    urllib.request.urlretrieve(payload['code_url'], payload['code_file'])
+                except Exception:
+                    urllib.request.urlretrieve(payload['code_url'], payload['code_file'])
+                else:
+                    break
 
 
+            # while True:
+
+            #     response = requests.get(payload['code_url'], verify=False, headers={'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 11_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'}, stream=True)
+            #     if response.status_code == 200:
+            #         with open(payload['code_file'], 'wb') as f:
+            #             f.write(response.raw.read())
+            #     else:
+            #         if download == 2:
+            #             termerror('Unable to get model. Please contact info@alectio.com if this persists')
+            #             sys.exit(1)
+            #         else:
+            #             termerror('Retrying to fetch the model')
+            #     download += 1
+            if not path.exists('./'+payload['code_file'].replace('.tar.gz', "")):
+                with tarfile.open(payload['code_file'], 'r') as archive:
+                    archive.extractall()
+
+            os.chdir(payload['code_file'].replace('.tar.gz', ''))
+            if not path.exists('./data'):
+                os.mkdir('data')
+    
+            if not path.exists('./log'):
+                os.mkdir('log')
+
+            if not path.exists('./weights'):
+                os.mkdir('weights')
+            
+            if not path.exists('./weight'):
+                os.mkdir('weight')
+
+            if payload['data_url'] == 'Inplace':
+                _log('Data will be dowloaded on first run of code')
+        
+            elif payload['data_url'] == 'Internal':
+                pass
+
+            else:
+                while True:
+                    if path.exists('./data/'+payload['data_file']):
+                        break
+                    try:
+                        urllib.request.urlretrieve(payload['data_url'], "./data/"+payload['data_file'])
+                    except Exception:
+                        urllib.request.urlretrieve(payload['data_url'], "./data/"+payload['data_file'])
+                    else:
+                        break
+                # downloader.download_file(payload['data_url'], './data' + payload['data_file'])
+                _log('Extracting Data into data dir')
+                os.chdir('./data')
+                if not path.exists('./'+payload['data_file'].replace('.tar.gz', "")):
+                    with tarfile.open('./' + payload['data_file'], 'r') as archive:
+                        archive.extractall()
+                os.chdir('../')
+
+                _log('All files are feteched.')
+
+                if auto_run:
+                    pass
+                else:
+                    print('Run you experiment by installing all dependencies with %s/requirements.txt and the run running python main.py %s at: %s'  % (os.getcwd(), token, os.getcwd()))
+
+
+
+
+        
 
 
 

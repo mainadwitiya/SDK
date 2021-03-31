@@ -5,8 +5,8 @@ import alectio_sdk.proto.bidirectional_pb2_grpc as bidirectional_pb2_grpc
 import alectio_sdk.proto.bidirectional_pb2 as bidirectional_pb2
 
 
-GRPCBACKEND = "50.112.116.244:50051"
-
+GRPCBACKEND = "grpc.alectio.com:50051"
+credentials = grpc.ssl_channel_credentials()
 
 class Backend(object):
     def __init__(self, token):
@@ -29,14 +29,16 @@ class Backend(object):
         # project_id = request.get_json()['project_id']
         # user_id = request.get_json()['user_id']
         # experiment_id = request.get_json()['experiment_id']
-        with grpc.insecure_channel('50.112.116.244:50051') as channel:
+        credentials = grpc.ssl_channel_credentials()
+        with grpc.secure_channel(GRPCBACKEND, credentials) as channel:
             stub = bidirectional_pb2_grpc.BidirectionalStub(channel)
             responses = stub.GetStartExperimentResponse(self.make_start_exp_payload())
             for response in responses:
                 return response.exp_token
     
     def getSDKResponse(self):
-        with grpc.insecure_channel('50.112.116.244:50051') as channel:
+        credentials = grpc.ssl_channel_credentials()
+        with grpc.secure_channel(GRPCBACKEND, credentials) as channel:
             stub = bidirectional_pb2_grpc.BidirectionalStub(channel)
             responses = stub.GetSDKResponse(self.make_sdk_response_payload())
             response_obj = next(responses)
@@ -79,7 +81,8 @@ def send_message(stub):
 
 
 def run():
-    with grpc.insecure_channel('50.112.116.244:50051') as channel:
+    credentials = grpc.ssl_channel_credentials()
+    with grpc.secure_channel(GRPCBACKEND, credentials) as channel:
         stub = bidirectional_pb2_grpc.BidirectionalStub(channel)
         send_message(stub)
 
@@ -88,4 +91,3 @@ if __name__ == '__main__':
     #run()
     backend = Backend("03af80240af4084af08320adf03040")
     backend.startExperiment()
-

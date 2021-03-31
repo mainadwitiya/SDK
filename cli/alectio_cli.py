@@ -21,22 +21,21 @@ from alectio_sdk.api.experiment import Experiment
 from alectio_sdk.api.model import Model
 from alectio_sdk.api.job import Job
 
-from alectio_sdk.tools.utils import extract_id
+from alectio_sdk.tools.utils import extract_id, credentials_exists, get_credentials
 from alectio_sdk.tools.fragments import *
 from alectio_sdk.tools.mutations import *
-
+from alectio_sdk.tools.utils import credentials_exists
 from alectio_sdk.exceptions import APIKeyNotFound
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class AlectioClient:
-    def __init__(self, environ=os.environ):
+    def __init__(self, environ=os.environ, api_key = None):
         self._environ = environ
-
-        if 'ALECTIO_API_KEY' not in self._environ:
+            
+        if not api_key and 'ALECTIO_API_KEY' not in self._environ and not credentials_exists:
             raise APIKeyNotFound
 
-        self._api_key = self._environ['ALECTIO_API_KEY']
         self._client_token = None
         # cli user settings
         self._settings = {
@@ -46,8 +45,34 @@ class AlectioClient:
             'prod_base_url': "https://api.alectio.com"
         }
 
+            
+        if api_key:
+            os.environ['ALECTIO_API_KEY'] = api_key
+            self._environ['ALECTIO_API_KEY'] = api_key
+            self._api_key = self._environ['ALECTIO_API_KEY'] if 'ALECTIO_API_KEY' in self._environ else api_key
+            try:
+                headers = {"Authorization": "Bearer " + api_key}
+                r = requests.get(self._settings['env_base_url']+'/api/me', headers=headers)
+                if r.status_code == 401:
+                    print("Expired or Wrong API Key. Please run alectio login YOU_API_KEY")
+                elif r.status_code == 200:
+                    self._user_id = r.get_json()['id']
+                else:
+                    print('Something Went wrong. Check you API Key')
+            except:
+                print('\n Alectio Error: Something Went wrong.\n')
+
+        else:
+            self._api_key_data = get_credentials()
+            print(self._api_key_data)
+            os.environ['ALECTIO_API_KEY'] = self._api_key_data['api_key']
+            self._environ['ALECTIO_API_KEY'] =  self._api_key_data['api_key']
+            self._api_key = self._api_key_data['api_key']
+            self._user_id = self._api_key_data['user_id']
+
+
         # self._endpoint = f'{self._settings['base_url']}/graphql'
-        self._endpoint = self._settings['prod_base_url'] + "/graphql"
+        self._endpoint = self._settings['env_base_url'] + "/graphql"
 
         # graphql client
         self._client = Client(
@@ -55,6 +80,7 @@ class AlectioClient:
                 url=self._endpoint,
                 verify=False,
                 retries=3,
+                headers={'APIKEY': self._api_key}
             ),
             fetch_schema_from_transport=True,
         )
