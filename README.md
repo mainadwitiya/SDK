@@ -17,7 +17,7 @@
     <summary> <strong>Info Hub </strong></summary>
     <a href="https://medium.com/alectio/everything-you-wanted-to-know-about-alectio-ee70e105f7f">Who are we »</a>
     <br />
-    <a href="https://www.notion.so/AlectioSDK-c8fd44a44249497f95a25fac282c2d87">Setup docs »</a>
+    <a href="https://docs.alectio.com/docs/setup-overview">Setup docs »</a>
     <br />
     <a href="https://github.com/alectio/AlectioExample">Alectio Examples »</a>
     <br />
