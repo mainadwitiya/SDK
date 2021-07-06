@@ -97,7 +97,7 @@ Please follow instructions [here](https://docs.alectio.com/docs/setup-overview) 
 
 <!-- USAGE EXAMPLES -->
 ## Custom Usage
-Once you are done installing the above you are good to go. If you want to run one of our examples you should follow the remaining installation instructions detailed in the [examples](https://github.com/alectio/AlectioSDK/tree/master/examples) directory. We cover examples for [topic classification](https://github.com/alectio/AlectioSDK/tree/master/examples/topic_classification), for [image classification](https://github.com/alectio/AlectioSDK/tree/master/examples/image_classification) and for [object detection](https://github.com/alectio/AlectioSDK/tree/master/examples/object_detection).
+Once you are done installing the above you are good to go. If you want to run one of our examples you should follow the remaining installation instructions detailed in the [examples](https://github.com/alectio/AlectioExamples) directory. We cover examples for [topic classification](https://github.com/alectio/AlectioExamples/topic_classification), for [image classification](https://github.com/alectio/AlectioExamples/image_classification) and for [object detection](https://github.com/alectio/AlectioExamples/object_detection).
 
 ### Required implementations 
 To use AlectioSDK on a custom model/dataset you are required to create the following two python files inside your model implementation folder. Lets say for you have your model implemented in folder Detector  
