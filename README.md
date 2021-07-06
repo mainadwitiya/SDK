@@ -93,7 +93,7 @@ The SDK is mainly built using the following
 
 
 ### Installation
-Please follow instructions [here](https://www.notion.so/AlectioSDK-c8fd44a44249497f95a25fac282c2d87) to get started with the installation. If you want to give a quick trial run with our ready to go example, follow the instructions [here](https://github.com/alectio/cifar_image_classification)
+Please follow instructions [here](https://docs.alectio.com/docs/setup-overview) to get started with the installation. If you want to give a quick trial run with our ready to go example, follow the instructions [here](https://github.com/alectio/cifar_image_classification)
 
 <!-- USAGE EXAMPLES -->
 ## Custom Usage
