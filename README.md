@@ -19,7 +19,7 @@
     <br />
     <a href="https://docs.alectio.com/docs/setup-overview">Setup docs »</a>
     <br />
-    <a href="https://github.com/alectio/AlectioExample">Alectio Examples »</a>
+    <a href="https://github.com/alectio/AlectioExamples">Alectio Examples »</a>
     <br />
     <a href="https://www.youtube.com/watch?v=Y7lnQYmrlBI&t=43s">How to create a Project »</a>
     <br />
@@ -196,7 +196,7 @@ The test function needs to return a dictionary with two keys
 | predictions | a dictionary of an index and a prediction for each test sample|
 | labels | a dictionary of an index and a ground truth label for each test sample|
 
-The format of the values depends on the type of ML problem. Please refer to the [examples](https://github.com/alectio/AlectioSDK/tree/master/examples) directory for details regarding what is needed for each usecase.
+The format of the values depends on the type of ML problem. Please refer to the [examples](https://github.com/alectio/AlectioExamples) directory for details regarding what is needed for each usecase.
 
 ##### Infer process 
 The logic for applying the model to infer on the unlabeled data should be implemented in this process.
@@ -235,7 +235,7 @@ The `infer` function needs to return a dictionary with one key
 | outputs | a dictionary of indexes mapped to the models output before an activation function is applied |
 
 For example, if it is a classification problem, return the output **before** applying softmax.
-For more details about the format of the output, please refer to the [examples](https://github.com/alectio/AlectioSDK/tree/master/examples) directory.
+For more details about the format of the output, please refer to the [examples](https://github.com/alectio/AlectioExamples) directory.
 
 ##### Datamap process
 The logic that creates a reference table to refer to all of your data
@@ -259,7 +259,7 @@ The `getdatasetstate` function needs to return a dictionary which contains index
 
 #### main.py
 Use the main.py to feed in all 4 above processes into AlectioSDK
-Refer to one of our [examples](https://github.com/alectio/AlectioSDK/tree/master/examples) and it will be easier for you to mimic the same. All you need now is an experiment name that you can come up with and unique experiment token that you can get from Alectio's FE
+Refer to one of our [examples](https://github.com/alectio/AlectioExamples) and it will be easier for you to mimic the same. All you need now is an experiment name that you can come up with and unique experiment token that you can get from Alectio's FE
 
 ```python
 
@@ -414,7 +414,7 @@ Email - info@alectio.com
 
 <!-- ACKNOWLEDGEMENTS -->
 ## Acknowledgements
-* Almost all of our [Examples](https://github.com/alectio/AlectioSDK/tree/master/examples) are open sourced well known models. We don't claim ownership for any of those.
+* Almost all of our [Examples](https://github.com/alectio/AlectioExamples) are open sourced well known models. We don't claim ownership for any of those.
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
